@@ -1,0 +1,8 @@
+.DS_Store
+.#*
+/commands/db/migrate/*
+/commands/db/migrate/version
+
+compiled/
+*/compiled
+.idea/
