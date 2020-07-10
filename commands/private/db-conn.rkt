@@ -29,7 +29,7 @@
     [("test")
      "./config/database-test.rkt"]
     [else
-     "./config/database-development.rkt"]))
+     "./config/database.rkt"]))
 
 (define (read-db-config)
   (with-input-from-file database-config-path
