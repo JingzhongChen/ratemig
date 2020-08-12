@@ -481,7 +481,7 @@ DEFAULT CURRENT_TIMESTAMP")
                                        "`id` int(11) NOT NULL AUTO_INCREMENT;"))))
 
   (test-case
-      "test create-table #:timestamp #f, #:id #f, #:charset 'utf8mb4_general_ci'"
+      "test create-table #:timestamp #f, #:id #f, #:charset 'utf8mb4'"
     (check-equal? (create-table peers
                                 ((user_id int(11) #:null #f)
                                  (user_name int(11) #:default "user" #:null #f)
@@ -489,7 +489,7 @@ DEFAULT CURRENT_TIMESTAMP")
                                  (last_action_at datetime #:null #f)
                                  (last_ping_at datetime #:default NULL)
                                  (login_count int(11) #:default 0))
-                                #:charset "utf8mb4_general_ci"
+                                #:charset "utf8mb4"
                                 #:timestamp #f
                                 #:id #f)
                   (list (string-append "CREATE TABLE `peers` ("
@@ -499,7 +499,7 @@ DEFAULT CURRENT_TIMESTAMP")
                                        "`last_action_at` datetime NOT NULL,"
                                        "`last_ping_at` datetime DEFAULT NULL,"
                                        "`login_count` int(11) DEFAULT '0'"
-                                       ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4_general_ci;"))))
+                                       ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"))))
 
   (test-case
       "test change-column"
