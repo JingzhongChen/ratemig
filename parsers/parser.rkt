@@ -14,6 +14,9 @@
          add-column
          remove-column)
 
+(module+ test
+  (require rackunit))
+
 (define-syntax (primary-key stx)
   (syntax-case stx ()
     [(_ table-name key)
@@ -82,13 +85,51 @@
                       (symbol->string 'table)
                       ";")]))
 
+(define (parse-table-option key
+                            #:id
+                            [id #t]
+                            #:timestamp
+                            [timestamp #t]
+                            #:charset
+                            [charset "utf8"])
+  ;; (printf "~S\n" `(id ,id timestamp ,timestamp charset ,charset))
+  (case key
+    [(id) id]
+    [(timestamp) timestamp]
+    [(charset) charset]
+    [else (raise
+           (make-exn:fail "parse-table-option fail"
+                          (current-continuation-marks)))]))
+
+(module+ test
+  (test-case
+      "test parse-table-option"
+    (check-equal? "utf8"
+                  (parse-table-option 'charset))
+    (check-equal? "utf8mb4_general_ci"
+                  (parse-table-option 'charset
+                                      #:charset "utf8mb4_general_ci"
+                                      #:id #t
+                                      #:timestamp #f))
+    (check-true (parse-table-option 'id))
+    (check-false (parse-table-option 'id
+                                    #:charset "utf8mb4_general_ci"
+                                    #:id #f
+                                    #:timestamp #f))
+    (check-true (parse-table-option 'timestamp))
+    (check-false (parse-table-option 'timestamp
+                                     #:charset "utf8mb4_general_ci"
+                                     #:id #t
+                                     #:timestamp #f))))
+
 (define-syntax (create-table stx)
   (syntax-case stx ()
-    [(_ table-name ((column-name ...) ...) #:id id? #:timestamp timestamp?)
-     #'(let* ([id-string (if (equal? 'id? '#t)
+    ;; [(_ table-name ((column-name ...) ...) #:id id? #:timestamp timestamp?)
+    [(_ table-name ((column-name ...) ...) keys ...)
+     #'(let* ([id-string (if (equal? (parse-table-option 'id keys ...) #t)
                              (list "`id` int(11) NOT NULL")
                              '())]
-              [id-modify (if (equal? 'id? '#t)
+              [id-modify (if (equal? (parse-table-option 'id keys ...) #t)
                              (list
                               (string-append "ALTER TABLE `"
                                              (symbol->string 'table-name)
@@ -99,7 +140,7 @@
                                              "` "
                                              "MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;"))
                              '())]
-              [timestamp-string (if (equal? 'timestamp? '#t)
+              [timestamp-string (if (equal? (parse-table-option 'timestamp keys ...) #t)
                                     (list
                                      "`created_at` datetime NOT NULL \
 DEFAULT CURRENT_TIMESTAMP"
@@ -116,16 +157,10 @@ DEFAULT CURRENT_TIMESTAMP")
                                            (string-join
                                             column-list
                                             ",")
-                                           ") ENGINE=InnoDB DEFAULT CHARSET=utf8;")])
-         (cons table-string id-modify))]
-    [(_ table-name ((column-name ...) ...) #:timestamp timestamp? #:id id?)
-     #'(create-table table-name ((column-name ...) ...) #:id id? #:timestamp timestamp?)]
-    [(_ table-name ((column-name ...) ...) #:id id?)
-     #'(create-table table-name ((column-name ...) ...) #:id id? #:timestamp #t)]
-    [(_ table-name ((column-name ...) ...) #:timestamp timestamp?)
-     #'(create-table table-name ((column-name ...) ...) #:id #t #:timestamp timestamp?)]
-    [(_ table-name ((column-name ...) ...))
-     #'(create-table table-name ((column-name ...) ...) #:id #t #:timestamp #t)]))
+                                           ") ENGINE=InnoDB DEFAULT CHARSET="
+                                           (parse-table-option 'charset keys ...)
+                                           ";")])
+         (cons table-string id-modify))]))
 
 (define (default-string default)
   (cond [(string? default) (string-append "'" default "'")]
@@ -259,7 +294,6 @@ DEFAULT CURRENT_TIMESTAMP")
         (raise-syntax-error #f "mismatch params!" #f #'#,stx))]))
 
 (module+ test
-  (require rackunit)
 
   (test-case
       "test primary-key"
@@ -445,6 +479,27 @@ DEFAULT CURRENT_TIMESTAMP")
                                        "ADD PRIMARY KEY (`id`);")
                         (string-append "ALTER TABLE `peers` MODIFY "
                                        "`id` int(11) NOT NULL AUTO_INCREMENT;"))))
+
+  (test-case
+      "test create-table #:timestamp #f, #:id #f, #:charset 'utf8mb4_general_ci'"
+    (check-equal? (create-table peers
+                                ((user_id int(11) #:null #f)
+                                 (user_name int(11) #:default "user" #:null #f)
+                                 (mark varchar(255) #:null #f)
+                                 (last_action_at datetime #:null #f)
+                                 (last_ping_at datetime #:default NULL)
+                                 (login_count int(11) #:default 0))
+                                #:charset "utf8mb4_general_ci"
+                                #:timestamp #f
+                                #:id #f)
+                  (list (string-append "CREATE TABLE `peers` ("
+                                       "`user_id` int(11) NOT NULL,"
+                                       "`user_name` int(11) NOT NULL DEFAULT 'user',"
+                                       "`mark` varchar(255) NOT NULL,"
+                                       "`last_action_at` datetime NOT NULL,"
+                                       "`last_ping_at` datetime DEFAULT NULL,"
+                                       "`login_count` int(11) DEFAULT '0'"
+                                       ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4_general_ci;"))))
 
   (test-case
       "test change-column"
